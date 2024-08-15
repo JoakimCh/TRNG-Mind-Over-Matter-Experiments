@@ -3,10 +3,19 @@
   color-scheme: light dark
 }
 
+body {
+  margin: 0;
+}
+
+button {
+  margin: 10px;
+  font-size: large;
+}
+
 #word-container {
   font-size: 24px;
   font-family: Arial, sans-serif;
-  margin: 50px;
+  margin: 20px;
 }
 
 .word {

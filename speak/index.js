@@ -1,16 +1,17 @@
 
 import {TRNG} from '../TRNG.browser.js'
-const log = console.log
+import {log, css} from '../common.js'
 
 // (44100 is one second of samples)
 const trng = new TRNG({blockSize: 44100, outputLength: 16})
 
 const start = document.createElement('button')
 const stop = document.createElement('button')
-start.textContent = 'Access microphone'
-stop.textContent = 'Stop'
+start.textContent = 'Start experiment'
+stop.textContent = 'Stop experiment'
 document.body.append(start)
 
+let running
 const cfg = {
   weights: {
     noWord: 500, // for speed control
@@ -25,13 +26,15 @@ const cfg = {
 start.onclick = async () => {
   if (trng.start()) {
     start.remove()
+    document.body.prepend(stop)
+    running = true
     const words = await loadWordlist()
     const weights = [
       cfg.weights.unbiased, // 0
       cfg.weights.biased,   // 1
       cfg.weights.noWord
     ]
-    while (true) {
+    while (running) {
       const cmd = await trng.weightedInteger(weights)
       switch (cmd) {
         case 0: { // select without a bias
@@ -47,7 +50,11 @@ start.onclick = async () => {
   }
 }
 stop.onclick = () => {
-  trng.stop()
+  if (trng.stop()) {
+    stop.remove()
+    document.body.prepend(start)
+    running = false
+  }
 }
 
 async function getVoices(timeout = 4000) {
@@ -86,21 +93,7 @@ async function loadWordlist() {
   return words
 }
 
-
-function loadCSSfile(url) {
-  const link = document.createElement('link')
-  link.rel = 'stylesheet'
-  link.href = url
-  document.head.append(link)
-}
-
-function loadCSS(cssString) {
-  const style = document.createElement('style')
-  style.textContent = cssString
-  document.head.append(style)
-}
-
-loadCSSfile('./style.css')
+css.fromFile('style.css')
 
 const wordContainer = document.createElement('div')
 wordContainer.id = 'word-container'

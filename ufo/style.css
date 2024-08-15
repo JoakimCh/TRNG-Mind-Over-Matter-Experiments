@@ -1,0 +1,24 @@
+
+:root {
+  color-scheme: light dark
+}
+
+body, html {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+#ufo {
+  position: absolute;
+  left: 50%;
+  width: 100px;
+  transform: translateX(-50%);
+  transition: bottom 0.1s;
+}
+
+button {
+  margin: 10px;
+  font-size: large;
+}

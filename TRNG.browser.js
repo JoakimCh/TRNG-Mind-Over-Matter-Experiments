@@ -48,15 +48,15 @@ export class TRNG {
           blockSize: this.#cfg.blockSize,
           outputSize: this.#cfg.outputLength * 4
         }
-        // e.g. for each 1000 samples extract 4 bytes of random data
         // (each output byte will consume a minimum of 16 samples)
       })
       this.#worklet.port.onmessage = ({data: {error, data}}) => {
         if (!error) {
           this.#handleData(data)
         } else {
-          this.stop()
-          throw error
+          console.error('TRNG problem...')
+          // this.stop()
+          // throw error
         }
       }
     }
@@ -64,7 +64,6 @@ export class TRNG {
       await audioCtx.resume()
     }
     if (!this.#micStream) {
-      console.log('Starting TRNG.')
       this.#micStream = await navigator.mediaDevices.getUserMedia({audio: true})
       const source = this.#audioContext.createMediaStreamSource(this.#micStream)
       source.connect(this.#worklet).connect(this.#audioContext.destination)
@@ -80,7 +79,6 @@ export class TRNG {
 
   stop() {
     if (!this.#micStream) return
-    log('Stopping TRNG.')
     this.#micStream.getTracks().forEach(track => track.stop())
     this.#micStream = undefined
     return true

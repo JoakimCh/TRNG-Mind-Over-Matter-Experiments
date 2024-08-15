@@ -79,7 +79,7 @@ class TRNG extends AudioWorkletProcessor {
       this.port.postMessage({
         data: bytes.buffer,
         truncated: byteIndex,
-        error: `TRNG outputSize (${this.#cfg.outputSize}) is more than it could gather from the blockSize (${this.#cfg.blockSize}). Which usually means that it's receiving poor input data or has a too small blockSize.`
+        error: `TRNG outputSize (${this.#cfg.outputSize}) is more than it could gather (${byteIndex}) from the blockSize (${this.#cfg.blockSize}). Which usually means that it's receiving poor input data or has a too small blockSize.`
       }, [bytes.buffer])
     }
   }
