@@ -11,7 +11,9 @@ start.textContent = 'Start experiment'
 stop.textContent = 'Stop experiment'
 document.body.append(start)
 
-let running
+// log(await getVoices())
+
+let running, stopping
 const cfg = {
   weights: {
     noWord: 500, // for speed control
@@ -20,21 +22,23 @@ const cfg = {
   },
   visibleTime: 3000,
   volume: 1.0,
-  utteranceSpeed: 0.7
+  utteranceSpeed: 1.0
 }
 
 start.onclick = async () => {
-  if (trng.start()) {
-    start.remove()
-    document.body.prepend(stop)
+  // speak('starting')
+  if (!running) {
     running = true
+    start.remove()
+    await trng.start()
+    document.body.prepend(stop)
     const words = await loadWordlist()
     const weights = [
       cfg.weights.unbiased, // 0
       cfg.weights.biased,   // 1
       cfg.weights.noWord
     ]
-    while (running) {
+    while (!stopping) {
       const cmd = await trng.weightedInteger(weights)
       switch (cmd) {
         case 0: { // select without a bias
@@ -47,13 +51,16 @@ start.onclick = async () => {
         } break
       }
     }
+    trng.stop()
+    running = false
+    stopping = false
+    document.body.prepend(start)
   }
 }
 stop.onclick = () => {
-  if (trng.stop()) {
+  if (!stopping) {
+    stopping = true
     stop.remove()
-    document.body.prepend(start)
-    running = false
   }
 }
 
@@ -67,12 +74,14 @@ async function getVoices(timeout = 4000) {
 }
 
 function speak(text, unbiased = false) {
+  log((unbiased ? 'unbiased: ' : '') + text)
+  displayWord(text, {unbiased, visibleTime: cfg.visibleTime})
   const utterance = new SpeechSynthesisUtterance(text)
   utterance.volume = cfg.volume
   utterance.rate = cfg.utteranceSpeed
   utterance.onstart = ({utterance}) => {
-    displayWord(text, {unbiased, visibleTime: cfg.visibleTime})
-    log((unbiased ? 'unbiased: ' : '') + utterance.text)
+    // log('spoke: '+utterance)
+    // this service is sometimes down...
   }
   speechSynthesis.speak(utterance)
 }
@@ -80,7 +89,7 @@ function speak(text, unbiased = false) {
 async function loadWordlist() {
   const words = []
   try {
-    const response = await fetch('./en_50K.txt')
+    const response = await fetch('en_50K.txt')
     if (!response.ok) throw response.status
     const lines = (await response.text()).split('\n')
     for (const line of lines) {
@@ -107,7 +116,6 @@ function displayWord(word, {unbiased, visibleTime = 2000} = {}) {
   if (unbiased) {
     span.classList.add('unbiased')
   }
-  
   setTimeout(() => {
     span.classList.add('fade')
     setTimeout(() => {

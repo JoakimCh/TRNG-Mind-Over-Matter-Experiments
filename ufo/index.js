@@ -45,7 +45,7 @@ function updateUfoPosition() {
 }
 
 start.onclick = async () => {
-  if (trng.start()) {
+  if (await trng.start()) {
     start.remove()
     // document.body.append(stop)
     running = true
