@@ -19,7 +19,7 @@ The one I have developed to function inside your browser is extracting randomnes
 
 And I have made it so it should be easy for a spirit to affect it without much friction (it doesn't have to bend the physical rules TOO much). Which is an important detail if we want them to be able to use it!
 
-## Experiments:
+## Experiments (so far):
 
 ## Speak
 
@@ -43,5 +43,8 @@ You'll eventually see great progress if you do this often!
 
 [Try it here!](./ufo/)
 
+## End notes:
 
+I'm just getting started with this project! Eventually I will have lots of interesting projects and statistical analysis ++...
 
+I will eventually create experiments for [ESP](https://en.wikipedia.org/wiki/Extrasensory_perception) as well! I might host them here or put them on a dedicated page (with a link here).
