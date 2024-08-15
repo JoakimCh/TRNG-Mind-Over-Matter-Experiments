@@ -37,6 +37,7 @@ start.onclick = async () => {
       cfg.weights.unbiased, // 0
       cfg.weights.biased,   // 1
       cfg.weights.noWord
+      // todo: number
     ]
     while (!stopping) {
       const cmd = await trng.weightedInteger(weights)

@@ -3,6 +3,11 @@
 
 <sub>For anyone reading this over at GitHub [click here to go to the website](https://joakimch.github.io/TRNG-Mind-Over-Matter-Experiments/).</sub>
 
+## Experiment list:
+
+* [UFO](./ufo)
+* [Speak](./speak)
+
 ## The theory behind this:
 
 It has [pretty much been proven](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5872141/) that our minds can alter true random number generators ([TRNGs](https://en.wikipedia.org/wiki/Hardware_random_number_generator)). Hence they can be used as a kind of computer connected interface which a strong enough mind can interact with! Your own mind or the mind of a spirit, e.g. an extra dimensional being!
