@@ -1,0 +1,24 @@
+
+#word-container {
+  font-size: 24px;
+  font-family: Arial, sans-serif;
+  margin: 50px;
+}
+
+.word {
+  display: inline-block;
+  opacity: 1;
+  max-width: 100%;
+  transition:
+    opacity 1s, 
+    max-width 1s;
+}
+
+.word.fade {
+  opacity: 0;
+  max-width: 0;
+}
+  
+.word.unbiased {
+  color: green;
+}
