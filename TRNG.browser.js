@@ -61,7 +61,7 @@ export class TRNG {
       }
     }
     if (this.#audioContext.state == 'suspended') {
-      await audioCtx.resume()
+      await this.#audioContext.resume()
     }
     if (!this.#micStream) {
       this.#micStream = await navigator.mediaDevices.getUserMedia({audio: true})
