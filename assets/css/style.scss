@@ -8,6 +8,14 @@
 }
 
 @media print, screen and (max-width: 480px) {
+  #header {
+    margin-top: initial;
+  }
+
+  section {
+    margin-top: initial;
+  }
+
   nav {
     display: initial;
   }
