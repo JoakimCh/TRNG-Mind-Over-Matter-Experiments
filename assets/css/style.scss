@@ -7,3 +7,8 @@
   display: none;
 }
 
+@media print, screen and (max-width: 480px) {
+  nav {
+    display: initial;
+  }
+}
