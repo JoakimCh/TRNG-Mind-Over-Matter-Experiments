@@ -3,7 +3,7 @@
 
 <sub>For anyone reading this over at GitHub [click here to go to the website](https://joakimch.github.io/TRNG-Mind-Over-Matter-Experiments/).</sub>
 
-## Experiment list:
+## Direct links to experiments:
 
 * [UFO](./ufo)
 * [Speak](./speak)
