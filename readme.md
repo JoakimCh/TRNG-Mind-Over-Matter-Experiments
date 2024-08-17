@@ -5,8 +5,8 @@
 
 ## Direct links to experiments:
 
-* [UFO](./ufo)
-* [Speak](./speak)
+* [UFO](./ufo) (use micro-psychokinesis to make a virtual UFO hover)
+* [Speak](./speak) (use the TRNG as an interdimensional communication bridge)
 
 ## The theory behind this:
 
