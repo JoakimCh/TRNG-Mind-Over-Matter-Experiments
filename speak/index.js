@@ -13,7 +13,7 @@ document.body.append(start)
 
 // log(await getVoices())
 
-let running, stopping
+let running, stopping, wakeLock
 const cfg = {
   weights: {
     noWord: 500, // for speed control
@@ -30,6 +30,7 @@ start.onclick = async () => {
   if (!running) {
     running = true
     start.remove()
+    wakeLock = await navigator.wakeLock?.request()
     await trng.start()
     document.body.prepend(stop)
     const words = await loadWordlist()
@@ -53,6 +54,7 @@ start.onclick = async () => {
       }
     }
     trng.stop()
+    wakeLock?.release()
     running = false
     stopping = false
     document.body.prepend(start)
