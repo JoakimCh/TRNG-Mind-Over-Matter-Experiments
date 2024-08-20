@@ -1,29 +1,36 @@
 
 import {TRNG} from '../TRNG.browser.js'
-import {log, css} from '../common.js'
+import {log, pageSetup, e, tags, wrap, unwrap} from '../wrapped-elements/wrapped-elements.js'
 
-css.fromFile('style.css')
+pageSetup({
+  title: 'UFO Experiment',
+  favicon: 'icon.png',
+  stylesheets: 'style.css'
+})
 
-const trng = new TRNG({
-  // one u32 60 times per second
+document.body.append(...unwrap(
+  e.h1('UFO Experiment'),
+  e.p('Use your mind to make it hover. ', e.small(
+    'One of my different ',
+    e.a('TRNG based experiments').href('../'), '.'
+  )),
+  e.button('Start experiment').tag('start'),
+  e.button('Stop experiment').tag('stop').hidden(true),
+  e.img.tagAndId('ufo').src('ufo.png').style({bottom: '0px'})
+))
+
+const {start, stop, ufo} = tags
+
+log('All is good! 😎')
+
+const trng = new TRNG({ // one u32 30 times per second
   blockSize: Math.trunc(44100 / 30),
   outputLength: 1
 })
 
-const start = document.createElement('button')
-const stop = document.createElement('button')
-start.textContent = 'Start experiment'
-stop.textContent = 'Stop experiment'
-document.body.append(start)
-
 let running
-const ufo = document.createElement('img')
-document.body.append(ufo)
-ufo.id = 'ufo'
-ufo.src = 'ufo.png'
 let topPosition = window.innerHeight - ufo.offsetHeight
 let position = 0
-ufo.style.bottom = `${Math.trunc(position)}px`
 
 window.addEventListener('resize', () => {
   const positionF =  position / topPosition
@@ -44,11 +51,13 @@ function updateUfoPosition() {
   ufo.style.bottom = `${Math.trunc(position)}px`
 }
 
+let wakeLock
 start.onclick = async () => {
   if (await trng.start()) {
     start.remove()
     // document.body.append(stop)
     running = true
+    wakeLock = await navigator.wakeLock?.request()
     updateUfoPosition()
     while (running) {
       const u32 = await trng.uInt32()
@@ -69,5 +78,6 @@ stop.onclick = () => {
     stop.remove()
     document.body.append(start)
     running = false
+    wakeLock?.release()
   }
 }

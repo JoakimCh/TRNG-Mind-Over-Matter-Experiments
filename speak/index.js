@@ -1,17 +1,32 @@
 
 import {TRNG} from '../TRNG.browser.js'
-import {log, css} from '../common.js'
+import {log, pageSetup, e, tags, wrap, unwrap, consumeTags} from '../wrapped-elements/wrapped-elements.js'
+
+pageSetup({
+  title: 'Speak Experiment',
+  favicon: 'speak.png',
+  stylesheets: 'style.css'
+})
+
+document.body.append(...unwrap(
+  e.h1('Speak Experiment'),
+  e.p('A strong enough mind can influence the spoken words! Which could enable trans-dimensional communication...'),
+  e.div.tagAndId('history'),
+  e.div.tagAndId('spoken'),
+  e.div(
+    e.button('Start experiment').tag('start'),
+    e.button('Stop experiment').tag('stop').hidden(true),
+  )
+))
+
+/** Our tagged elements.
+ * @info Here we use TypeScript type definitions so VSCode can know the contents of el.
+ * @type {Record<'start'|'stop'|'history'|'spoken', HTMLElement>} 
+*/
+const el = consumeTags()
 
 // (44100 is one second of samples)
 const trng = new TRNG({blockSize: 44100, outputLength: 16})
-
-const start = document.createElement('button')
-const stop = document.createElement('button')
-start.textContent = 'Start experiment'
-stop.textContent = 'Stop experiment'
-document.body.append(start)
-
-// log(await getVoices())
 
 let running, stopping, wakeLock
 const cfg = {
@@ -25,14 +40,16 @@ const cfg = {
   utteranceSpeed: 1.0
 }
 
-start.onclick = async () => {
-  // speak('starting')
+el.start.onclick = async () => {
   if (!running) {
     running = true
-    start.remove()
+    el.start.hidden = true
+    if (!el.history.textContent) {
+      el.history.textContent = 'History: '
+    }
     wakeLock = await navigator.wakeLock?.request()
     await trng.start()
-    document.body.prepend(stop)
+    el.stop.hidden = false
     const words = await loadWordlist()
     const weights = [
       cfg.weights.unbiased, // 0
@@ -57,13 +74,13 @@ start.onclick = async () => {
     wakeLock?.release()
     running = false
     stopping = false
-    document.body.prepend(start)
+    el.start.hidden = false
   }
 }
-stop.onclick = () => {
+el.stop.onclick = () => {
   if (!stopping) {
     stopping = true
-    stop.remove()
+    el.stop.hidden = true
   }
 }
 
@@ -77,14 +94,12 @@ async function getVoices(timeout = 4000) {
 }
 
 function speak(text, unbiased = false) {
-  log((unbiased ? 'unbiased: ' : '') + text)
   displayWord(text, {unbiased, visibleTime: cfg.visibleTime})
   const utterance = new SpeechSynthesisUtterance(text)
   utterance.volume = cfg.volume
   utterance.rate = cfg.utteranceSpeed
   utterance.onstart = ({utterance}) => {
-    // log('spoke: '+utterance)
-    // this service is sometimes down...
+    // this service is not enabled in every browser
   }
   speechSynthesis.speak(utterance)
 }
@@ -105,24 +120,16 @@ async function loadWordlist() {
   return words
 }
 
-css.fromFile('style.css')
-
-const wordContainer = document.createElement('div')
-wordContainer.id = 'word-container'
-document.body.append(wordContainer)
-
 function displayWord(word, {unbiased, visibleTime = 2000} = {}) {
-  const span = document.createElement('span')
-  wordContainer.append(span)
-  span.className = 'word'
-  span.textContent = word + '\u00A0'
-  if (unbiased) {
-    span.classList.add('unbiased')
-  }
+  log((unbiased ? 'unbiased: ' : '') + word)
+  const span = e.span(word + '\u00A0').className('word')
+  if (unbiased) span.classList.add('unbiased')
+  el.spoken.append(span.element)
   setTimeout(() => {
     span.classList.add('fade')
     setTimeout(() => {
       span.remove()
-    }, 2000) // fade time
+      el.history.textContent += word + ' '
+    }, 1000) // fade time
   }, visibleTime)
 }

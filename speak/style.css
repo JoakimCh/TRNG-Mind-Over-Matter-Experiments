@@ -1,20 +1,13 @@
 
-:root {
-  color-scheme: light dark
-}
-
-body {
-  margin: 0;
-}
-
 button {
   margin: 10px;
   font-size: large;
 }
 
-#word-container {
+#spoken {
   font-size: 24px;
   font-family: Arial, sans-serif;
+  min-height: 24px;
   margin: 20px;
 }
 
