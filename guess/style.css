@@ -9,6 +9,15 @@
   user-select: none;
 }
 
+[hidden] {
+  display: none !important;
+}
+
+[disabled] {
+  pointer-events: none;
+  opacity: 0.2;
+}
+
 input, button {
   margin-right: 5px;
   margin-bottom: 5px;
@@ -41,16 +50,28 @@ body {
 h1 {
   margin: 0;
   margin-top: 10px;
+  text-align: center;
 }
 
 h1, p {
   user-select: text;
 }
 
+.offline {
+  color: orangered;
+}
+.online {
+  color: green;
+}
+.reconnecting {
+  color: orange;
+}
+
 .cleanBreak {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: baseline;
+  justify-content: center;
 }
 
 #container {
@@ -65,14 +86,26 @@ h1, p {
   min-width: min-content;
 }
 
+#gameUI {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* &[disabled] {
+    pointer-events: none;
+    opacity: 0.1;
+  } */
+}
+
 #table {
   display: flex;
+  justify-content: center;
   flex-direction: row;
   flex-wrap: wrap;
-  gap: 5px;
+  gap: 7px;
   row-gap: 5px;
   margin-bottom: 5px;
   > .card {
+    cursor: pointer;
     width: 100px;
     transition: 
       opacity 1.0s ease;

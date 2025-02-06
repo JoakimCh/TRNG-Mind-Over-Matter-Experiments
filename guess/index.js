@@ -1,7 +1,7 @@
 
 import {RTCPerfectNegotiator} from 'rtc-perfect-negotiator'
 import {PeerServerSignalingClient} from 'tiny-peerserver-client'
-import {debug, pageSetup, e, tags, wrap, unwrap} from 'wrapped-elements'
+import {debug, pageSetup, e, tags, wrap, unwrap, consumeTags} from 'wrapped-elements'
 
 pageSetup({
   title: 'Guess Experiment',
@@ -14,41 +14,43 @@ document.body.append(...unwrap(
   e.div(
     e.h1('The Guess Experiment'),
     e.p('Connect to a peer and try to guess the randomly selected card shown on their screen. This can be done using remote viewing (extra sensory perception) or telepathy with the peer who can see the card. Version: 0.1.'),
-    //e.div(
-      e.div(
-        e.label('My ID:',
-          e.input().type('text').tagAndId('input_myId')
-          .value(localStorage.getItem('myId'))
-          .autocapitalize('none')
-        ),
-        e.label('Peer ID:', 
-          e.input().type('text').tagAndId('input_peerId')
-          .value(localStorage.getItem('peerId'))
-          .autocapitalize('none')
-        )
-      ).className('cleanBreak'),
-      e.div(
-      e.button('Ready for peer connection').tag('button_ready'),
-      e.button('Try to connect').tag('button_connect').disabled(true),
-      e.button('Disconnect').tag('button_disconnect').disabled(true),
-    ).className('cleanBreak'),
-    // ),
     e.div(
-      e.div(e.img().draggable(false).src('zener/star.svg')).className('card'),
-      e.div(e.img().draggable(false).src('zener/box.svg')).className('card'),
-      e.div(e.img().draggable(false).src('zener/waves.svg')).className('card'),
-      e.div(e.img().draggable(false).src('zener/cross.svg')).className('card'),
-      e.div(e.img().draggable(false).src('zener/circle.svg')).className('card'),
-    ).tagAndId('table'),
-    // todo: on guess remove those not selected, then show the selected card next to the correct card (as an animation), then the text correct or wrong
-    e.button('Make your guess!').tag('button_guess'),
-    e.span('Total score: 10 / 10'),
-    e.span('Last 10 guesses: 10 / 10')
+      e.label('My ID:',
+        e.input().type('text').tagAndId('input_myId')
+        .value(localStorage.getItem('myId'))
+        .autocapitalize('none')
+      ),
+      e.label('Peer ID:', 
+        e.input().type('text').tagAndId('input_peerId')
+        .value(localStorage.getItem('peerId'))
+        .autocapitalize('none')
+      )
+    ).className('cleanBreak').tagAndId('id_container'),
+    e.div(
+      e.button('Ready for peer connection').tag('button_ready'),
+      e.button('Abort peer connection').tag('button_abort').hidden(true),
+      e.button('Try to connect').tag('button_connect').hidden(true),
+      e.span('Offline.').tag('text_connection').className('offline'),
+    ).className('cleanBreak'),
+    e.div(
+      e.div(
+        e.div(e.img().draggable(false).src('zener/star.svg')).className('card'),
+        e.div(e.img().draggable(false).src('zener/box.svg')).className('card'),
+        e.div(e.img().draggable(false).src('zener/waves.svg')).className('card'),
+        e.div(e.img().draggable(false).src('zener/cross.svg')).className('card'),
+        e.div(e.img().draggable(false).src('zener/circle.svg')).className('card'),
+      ).tagAndId('table'),
+      e.button('Make your guess!').tag('button_guess'),
+      e.span('Total score: ', e.span('0 / 0').tag('text_score')),
+      e.span('Last 10 guesses: ', e.span('0 / 0').tag('text_last10'))
+    ).tagAndId('gameUI').set('disabled', '')
   ).id('container')
 ))
 
 const {input_myId, input_peerId, button_ready, 
-  button_connect, button_disconnect, table, button_guess} = tags
+  button_connect, table, button_guess, id_container,
+  button_abort, text_connection
+} = consumeTags()
 
 //document.querySelector('.element').classList.add('shrink');
 
@@ -75,7 +77,7 @@ for (const card of document.getElementsByClassName('card')) {
   card.onclick = card_onClick
 }
 
-
+//#region globals
 globalThis['DEBUG_SIGNALING'] = true
 const idSuffix = '-guessExp'
 let myId, peerId
@@ -105,93 +107,73 @@ const iceConfig = {
     }
   ]
 }
+//#endregion
 
-button_connect.onclick = () => {
-  button_connect.disabled = true
-  dataChannel = peerConnection.createDataChannel('protocol1')
-  initDataChannel()
-}
-
-button_disconnect.onclick = () => {
-  button_disconnect.disabled = true
-  peerConnection.close()
-}
-
-button_ready.onclick = async () => {
-  chat.replaceChildren() // clear chat
+button_ready.onclick = () => {
   myId = input_myId.value
   peerId = input_peerId.value
   if (!myId || !peerId) {
-    displayChatMessage('Please fill out "my ID" and "peer ID"!')
+    alert('Please fill out "my ID" and "peer ID"!')
     return
   }
-  button_ready.disabled = true
-  input_myId.disabled = true
-  input_peerId.disabled = true
-  checkbox_turn.disabled = true
-  sessionStorage.setItem('myId', myId)
-  sessionStorage.setItem('peerId', peerId)
+  localStorage.setItem('myId', myId)
+  localStorage.setItem('peerId', peerId)
+  id_container.setAttribute('disabled','')
+  button_ready.hidden = true
+  button_abort.hidden = false
   initPeerConnection(myId, peerId, idSuffix)
 }
 
-/** Since there are no reliable events on the RTCPeerConnection to monitor when it is closed we use a data channel to trigger this when it is closed. */
-function onClosed() {
-  displayChatMessage('Connection closed...')
-  // reset all buttons
-  input_myId.disabled = false
-  input_peerId.disabled = false
-  button_ready.disabled = false
-  checkbox_turn.disabled = false
-  button_connect.disabled = true
-  button_disconnect.disabled = true
-  button_send.disabled = true
+button_abort.onclick = () => {
+  resetConnection()
+}
+
+button_connect.onclick = () => {
+  button_connect.hidden = true
+  dataChannel = peerConnection.createDataChannel('protocol1')
+  onDataChannel({channel: dataChannel})
+}
+
+function resetConnection() {
+  peerConnection?.close()
+  signalingClient?.close()
+  text_connection.className = 'offline'
+  text_connection.textContent = 'Offline.'
+  button_connect.hidden = true
+  button_abort.hidden = true
+  id_container.removeAttribute('disabled')
+  button_ready.hidden = false
 }
 
 async function initPeerConnection(myId, peerId, suffix) {
   myId += suffix; peerId += suffix
   if (signalingClient) {
     if (!(signalingClient.ready && signalingClient.myId == myId)) {
-      signalingClient.reconnect(myId) // if closed or reconnecting with a new ID
+      signalingClient.reconnect(myId)
     }
-  } else { // we only create one client (which can reconnect when needed)
+  } else {
     signalingClient = new PeerServerSignalingClient({myId})
-    signalingClient.addEventListener('connecting', ({detail: {connectionAttempt, lastAttempt}}) => {
-      displayChatMessage(`Signaling channel connecting... ${connectionAttempt}/${signalingClient.maxConnectionAttempts}`)})
-    signalingClient.addEventListener('ready', () => {
-      displayChatMessage(`Signaling channel ready.`)})
-    signalingClient.addEventListener('closed', ({detail: {willRetry}}) => {
-      displayChatMessage(`Signaling channel closed, willRetry: ${willRetry}`)})
-    signalingClient.addEventListener('error', ({detail: {message, code}}) => {
-      displayChatMessage(`Signaling channel error: ${code} ${message}`)})
   }
   try {
     if (!signalingClient.ready) {
       await signalingClient.createReadyPromise()
     } else {
-      displayChatMessage('Signaling channel ready.')
+      debug('Signaling channel ready.')
     }
   } catch (error) {
-    if (error.code == 'SIGNALING_SERVER_TIMEOUT') {
-      displayChatMessage(`Signaling channel connection timeout.`)
-    }
-    input_myId.disabled = false
-    input_peerId.disabled = false
-    button_ready.disabled = false
+    button_abort.click()
+    alert(error)
     return
   }
   // signaling server ready
   const signalingChannel = signalingClient.getChannel(peerId)
   const negotiator = new RTCPerfectNegotiator({
-    peerConfiguration: (checkbox_turn.checked ? iceConfigWithTURN : iceConfig),
+    peerConfiguration: iceConfig,
     signalingChannel
   })
-  displayChatMessage(`Negotiator isPolite = ${negotiator.isPolite}`)
-  negotiator.addEventListener('error', ({detail: {message, code}}) => {
-    debugToChat(`error: ${code} (${peerConnection.signalingState}) ${message}`)})
   peerConnection = negotiator.peerConnection
-  button_connect.disabled = false // allow chat channel creation
+  button_connect.hidden = false
   initPeerConnectionEvents(peerConnection)
-  // debug('peerConfiguration:', peerConnection.getConfiguration())
   // (negotiation is not done before a channel or track is added)
 }
 
@@ -199,26 +181,45 @@ async function initPeerConnection(myId, peerId, suffix) {
  * @param {RTCPeerConnection} peerConnection 
  */
 function initPeerConnectionEvents(peerConnection) {
-  peerConnection.onnegotiationneeded = () => {
-    debugToChat('## negotiation needed ##')
-  }
+  peerConnection.ondatachannel = onDataChannel
   peerConnection.onconnectionstatechange = () => {
-    debugToChat('## connection state ##', peerConnection.connectionState)
+    debug('connectionState', peerConnection.connectionState)
     switch (peerConnection.connectionState) {
-      case 'connected': displayConnectionStats(); break
+      case 'connecting':
+        button_connect.hidden = true
+      break
+      case 'connected':
+        debugConnectionStats()
+        button_connect.hidden = true
+        text_connection.className = 'online'
+        text_connection.textContent = 'Online.'
+      break
+      case 'disconnected':
+        text_connection.className = 'reconnecting'
+        text_connection.textContent = 'Reconnecting...'
+      break
+      case 'closed':
+        resetConnection()
+      break
     }
   }
-  peerConnection.onsignalingstatechange = async () => {
-    debug('## signaling state ##', peerConnection.signalingState)
-  }
-  peerConnection.oniceconnectionstatechange = async () => {
-    debug('## ICE connection state ##', peerConnection.iceConnectionState)
-  }
-  peerConnection.ondatachannel = ({channel}) => {
-    debug('new data channel:', channel.label, peerConnection.connectionState, peerConnection.signalingState)
-    if (!dataChannel && channel.label == 'chat') {
-      dataChannel = channel
-      initChatChannel()
+}
+
+function onDataChannel({channel} = {}) {
+  if (channel.label == 'protocol1') {
+    dataChannel = channel
+
+    dataChannel.onopen = () => {
+
+    }
+    dataChannel.onmessage = ({data}) => {
+
+    }
+    dataChannel.onerror = ({error}) => {
+      // this will happen if other side e.g. refresh the tab
+    }
+    dataChannel.onclose = () => {
+      resetConnection() // (since there is no reliable events to monitor when a peerConnection is closed we use a data channel to know when)
     }
   }
 }
@@ -231,39 +232,11 @@ function debugConnectionStats() {
         const remoteCandidate = reports.get(report.remoteCandidateId)
         const [local, remote] = [localCandidate.candidateType, remoteCandidate.candidateType]
         if (localCandidate.candidateType == 'relay' || remoteCandidate.candidateType == 'relay') {
-          displayChatMessage(`Relayed connection successful! (${local}, ${remote})`)
+          debug(`Relayed connection successful! (${local}, ${remote})`)
         } else {
-          displayChatMessage(`Direct connection successful! (${local}, ${remote})`)
+          debug(`Direct connection successful! (${local}, ${remote})`)
         }
       }
     }
   })
-}
-
-function initDataChannel() {
-  button_connect.disabled = true
-  
-  dataChannel.onopen = () => {
-    debug('chat channel opened')
-    input_msg.focus()
-    button_send.disabled = false
-    button_disconnect.disabled = false
-  }
-  dataChannel.onmessage = ({data}) => {
-    debug('message received:', data)
-    if (typeof data == 'string') {
-      onChatMessage(data)
-    }
-  }
-  dataChannel.onerror = ({error}) => {
-    // this will happen if other side e.g. refresh the tab
-    debug('chat channel error:', error)
-  }
-  dataChannel.onclose = () => {
-    debug('chat channel closed:', peerConnection.connectionState, peerConnection.signalingState)
-    peerConnection.close() // if it isn't already
-    dataChannel = false
-    button_connect.disabled = false
-    onClosed() // (since there is no reliable events to monitor when a peerConnection is closed we use a data channel to know when)
-  }
 }
