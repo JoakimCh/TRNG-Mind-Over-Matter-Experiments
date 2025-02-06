@@ -152,7 +152,7 @@ function resetConnection() {
 async function initPeerConnection(myId, peerId, suffix) {
   myId += suffix; peerId += suffix
   try {
-    signalingClient = ensureClientReady({myId, signalingClient})
+    signalingClient = await ensureClientReady({myId, signalingClient})
   } catch (error) {
     button_abort.click()
     return alert(error)
