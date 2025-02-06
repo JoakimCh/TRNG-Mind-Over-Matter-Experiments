@@ -1,6 +1,6 @@
 
 import {RTCPerfectNegotiator} from 'rtc-perfect-negotiator'
-import {PeerServerSignalingClient} from 'tiny-peerserver-client'
+import {PeerServerSignalingClient, peerjsIceConfig, ensureClientReady} from 'tiny-peerserver-client'
 import {debug, pageSetup, e, tags, wrap, unwrap, consumeTags} from 'wrapped-elements'
 
 pageSetup({
@@ -35,7 +35,7 @@ if alternating then total and last10 lines can include stats for both e.g. 10 / 
 document.body.append(...unwrap(
   e.div(
     e.h1('The Guess Experiment'),
-    e.p('Connect to a peer and try to guess the randomly selected card shown on their screen. This can be done using remote viewing (extra sensory perception) or telepathy with the peer who can see the card. Version: 0.1.'),
+    e.p('Connect to a peer and try to guess the randomly selected card shown on their screen. This can be done using remote viewing (extra sensory perception) or telepathy with the peer who can see the card. Version: 0.2.'),
     e.div(
       e.label('My ID:',
         e.input().type('text').tagAndId('input_myId')
@@ -71,10 +71,21 @@ document.body.append(...unwrap(
   ).id('container')
 ))
 
+//#region global variables
 const {input_myId, input_peerId, button_ready, 
   button_connect, table, button_guess, id_container,
   button_abort, text_connection
 } = consumeTags()
+globalThis['DEBUG_SIGNALING'] = true
+const idSuffix = '-guessExp'
+let myId, peerId
+/** @type {PeerServerSignalingClient} */
+let signalingClient
+/** @type {RTCPeerConnection} */
+let peerConnection
+/** @type {RTCDataChannel} */
+let dataChannel
+//#endregion
 
 //document.querySelector('.element').classList.add('shrink');
 
@@ -100,38 +111,6 @@ for (const card of document.getElementsByClassName('card')) {
   card.draggable = false
   card.onclick = card_onClick
 }
-
-//#region globals
-globalThis['DEBUG_SIGNALING'] = true
-const idSuffix = '-guessExp'
-let myId, peerId
-/** @type {PeerServerSignalingClient} */
-let signalingClient
-/** @type {RTCPeerConnection} */
-let peerConnection
-/** @type {RTCDataChannel} */
-let dataChannel
-const iceConfig = {
-  iceServers: [
-    {
-      urls: [
-        'stun:stun.l.google.com:19302',
-        'stun:stun1.l.google.com:19302',
-        'stun:stun2.l.google.com:19302',
-        'stun:stun3.l.google.com:19302',
-        'stun:stun4.l.google.com:19302',
-      ]
-    }, { // from the PeerJS project: https://github.com/peers/peerjs/blob/master/lib/util.ts
-      username: 'peerjs',
-      credential: 'peerjsp',
-      urls: [
-        'turn:eu-0.turn.peerjs.com:3478',
-        'turn:us-0.turn.peerjs.com:3478',
-      ]
-    }
-  ]
-}
-//#endregion
 
 button_ready.onclick = () => {
   myId = input_myId.value
@@ -172,28 +151,15 @@ function resetConnection() {
 
 async function initPeerConnection(myId, peerId, suffix) {
   myId += suffix; peerId += suffix
-  if (signalingClient) {
-    if (!(signalingClient.ready && signalingClient.myId == myId)) {
-      signalingClient.reconnect(myId)
-    }
-  } else {
-    signalingClient = new PeerServerSignalingClient({myId})
-  }
   try {
-    if (!signalingClient.ready) {
-      await signalingClient.createReadyPromise()
-    } else {
-      debug('Signaling channel ready.')
-    }
+    signalingClient = ensureClientReady({myId, signalingClient})
   } catch (error) {
     button_abort.click()
-    alert(error)
-    return
+    return alert(error)
   }
-  // signaling server ready
   const signalingChannel = signalingClient.getChannel(peerId)
   const negotiator = new RTCPerfectNegotiator({
-    peerConfiguration: iceConfig,
+    peerConfiguration: peerjsIceConfig,
     signalingChannel
   })
   peerConnection = negotiator.peerConnection
