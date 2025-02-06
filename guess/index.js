@@ -143,6 +143,7 @@ function resetConnection() {
   button_abort.hidden = true
   id_container.removeAttribute('disabled')
   button_ready.hidden = false
+  id_container.hidden = false
 }
 
 async function initPeerConnection(myId, peerId, suffix) {
@@ -190,6 +191,7 @@ function initPeerConnectionEvents(peerConnection) {
       break
       case 'connected':
         debugConnectionStats()
+        id_container.hidden = true
         button_connect.hidden = true
         text_connection.className = 'online'
         text_connection.textContent = 'Online.'
