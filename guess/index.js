@@ -10,6 +10,28 @@ pageSetup({
   favicon: false // set to a blank one
 })
 
+/* todo 
+on connection hide table and display side selector,
+radio for which peer is remote viewer:
+remote viewer: you (), peer (), alternate (*)
+whenever someone clicks it changes for both... so they can fight
+then ready checkbox and a text indicating if peer is ready, ready is deselected on each switch
+when both ready it starts, first with text on which side you are:
+"A random card is shown to your peer, to score see if you can guess which!
+     (remote view it or use your telepathic ability)"
+[show cards] (then shows the cards and you can make selection)
+other side:
+header below cards: "this is the card your peer must guess to score
+        (either through remote viewing or telepathic ability)
+          you can help by transmitting it telepathically"
+
+stats are stored in the browser and can be downloaded as a csv
+then stats for each peer and session and total stats, etc
+a stat viewer is WIP...
+
+if alternating then total and last10 lines can include stats for both e.g. 10 / 10 (me) 10 / 10 (peer)
+*/
+
 document.body.append(...unwrap(
   e.div(
     e.h1('The Guess Experiment'),
@@ -33,13 +55,15 @@ document.body.append(...unwrap(
       e.span('Offline.').tag('text_connection').className('offline'),
     ).className('cleanBreak'),
     e.div(
-      e.div(
-        e.div(e.img().draggable(false).src('zener/star.svg')).className('card'),
-        e.div(e.img().draggable(false).src('zener/box.svg')).className('card'),
-        e.div(e.img().draggable(false).src('zener/waves.svg')).className('card'),
-        e.div(e.img().draggable(false).src('zener/cross.svg')).className('card'),
-        e.div(e.img().draggable(false).src('zener/circle.svg')).className('card'),
-      ).tagAndId('table'),
+      e.div(...((cards = []) => {
+        for (const variant of ['star','box','waves','cross','circle']) {
+          const card = e.div(
+            e.img().draggable(false).src(`zener/${variant}.svg`)
+          ).className('card')
+          cards.push(card)
+        }
+        return cards
+      })()).tagAndId('table'),
       e.button('Make your guess!').tag('button_guess'),
       e.span('Total score: ', e.span('0 / 0').tag('text_score')),
       e.span('Last 10 guesses: ', e.span('0 / 0').tag('text_last10'))
