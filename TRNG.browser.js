@@ -128,7 +128,7 @@ export class TRNG {
     return Math.floor(min + linearRandom * range)
   }
 
-  /** Supply an array of weights and randomly select indexes in it (preffering the highest weight). */
+  /** Supply an array of weights and randomly select indexes in it (preferring the highest weight). */
   async weightedInteger(weights) {
     const totalWeight = weights.reduce((sum, weight) => sum + weight, 0)
     const randomValue = await this.float32(totalWeight)
