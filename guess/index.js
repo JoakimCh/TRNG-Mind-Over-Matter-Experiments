@@ -36,38 +36,77 @@ document.body.append(...unwrap(
   e.div(
     e.h1('The Guess Experiment'),
     e.p('Connect to a peer and try to guess the randomly selected card shown on their screen. This can be done using remote viewing (extra sensory perception) or telepathy with the peer who can see the card. Version: 0.2.'),
-    e.div(
+    e.div.tagAndId('id_container')(
       e.label('My ID:',
-        e.input().type('text').tagAndId('input_myId')
-        .value(localStorage.getItem('myId'))
+        e.input.tagAndId('input_myId')
+        .type('text').value(localStorage.getItem('myId'))
         .autocapitalize('none')
       ),
       e.label('Peer ID:', 
-        e.input().type('text').tagAndId('input_peerId')
-        .value(localStorage.getItem('peerId'))
+        e.input.tagAndId('input_peerId')
+        .type('text').value(localStorage.getItem('peerId'))
         .autocapitalize('none')
       )
-    ).className('cleanBreak').tagAndId('id_container'),
-    e.div(
-      e.button('Ready for peer connection').tag('button_ready'),
-      e.button('Abort peer connection').tag('button_abort').hidden(true),
-      e.button('Try to connect').tag('button_connect').hidden(true),
-      e.span('Offline.').tag('text_connection').className('offline'),
-    ).className('cleanBreak'),
-    e.div(
-      e.div(...((cards = []) => {
+    ).class('horizontal'),
+    e.div( // connection buttons
+      e.button.tag('button_ready')('Ready for peer connection'),
+      e.button.tag('button_abort')('Abort peer connection').hidden(true),
+      e.button.tag('button_connect')('Try to connect').hidden(true),
+      e.span.tag('text_connection')('Offline').class('offline'),
+    ).class('horizontal'),
+    e.div.tagAndId('ui_selectSide')(
+      e.fieldset(e.legend('Select side:'),
+        e.label('Guesser:',
+          e.input.tagAndId('radio_guesser')
+          .type('radio').name('side')
+        ),
+        e.label('Viewer:',
+          e.input.tagAndId('radio_viewer')
+          .type('radio').name('side')
+        ),
+        e.label('Alternate:',
+          e.input.tagAndId('radio_alternate')
+          .type('radio').name('side')
+        )
+      ),
+      e.fieldset(e.legend('Ready to start?'),
+        e.label('Me:',
+          e.input.tagAndId('checkbox_ready')
+          .type('checkbox')
+        ),
+        e.label('Peer:',
+          e.input.tagAndId('checkbox_peerReady')
+          .type('checkbox')
+        ).style({pointerEvents: 'none'})
+      )
+    ).class('horizontal').hidden(true),
+    e.div.tagAndId('gameUI')(
+      e.div.tagAndId('table')(...((cards = []) => {
         for (const variant of ['star','box','waves','cross','circle']) {
           const card = e.div(
-            e.img().draggable(false).src(`zener/${variant}.svg`)
-          ).className('card')
+            e.img.draggable(false).src(`zener/${variant}.svg`)
+          ).class('card')
           cards.push(card)
         }
         return cards
-      })()).tagAndId('table'),
-      e.button('Make your guess!').tag('button_guess'),
-      e.span('Total score: ', e.span('0 / 0').tag('text_score')),
-      e.span('Last 10 guesses: ', e.span('0 / 0').tag('text_last10'))
-    ).tagAndId('gameUI').set('disabled', '')
+      })()),
+      e.div.tagAndId('viewerUI')(
+        e.p(`This is the card your peer must guess to score.`, e.br, 
+        `(either through remote viewing or telepathic ability)`, e.br, 
+          `You can help by transmitting it telepathically!`)
+      ).class('vertical').hidden(true),
+      e.div.tagAndId('guesserUI1')(
+        e.p(`A random card is shown to your peer, to score see if you can guess which!`, e.br, 
+        `(remote view it or use telepathic abilities)`),
+        e.button('View the cards')
+      ).class('vertical').hidden(true),
+      e.div.tagAndId('guesserUI2')(
+        e.button('Submit your guess!').tag('button_guess'),
+        e.span('Total score: ', e.span('0 / 0').tag('text_myScore')),
+        e.span('Last 10 guesses: ', e.span('0 / 0').tag('text_myLast10'))
+      ).class('vertical').hidden(true),
+    ).set('disabled'),
+    e.p('Made by Joakim L. Christiansen.', e.br, 'See the open source ', e.a('code at GitHub').href('https://github.com/JoakimCh/TRNG-Mind-Over-Matter-Experiments/tree/main/guess'), '.')
   ).id('container')
 ))
 
@@ -87,12 +126,17 @@ let peerConnection
 let dataChannel
 //#endregion
 
-//document.querySelector('.element').classList.add('shrink');
+function startGuesserSide() {
+
+}
 
 button_guess.onclick = () => {
+  //document.querySelector('.element').classList.add('shrink');
+  const cards = document.getElementsByClassName('card')
   let selectedIndex = Math.round(Math.random() * 5)
+  // cards[selectedIndex].classList.add('correct')
   let index = 0
-  for (const card of document.getElementsByClassName('card')) {
+  for (const card of cards) {
     if (index++ == selectedIndex) {
       card.classList.add('correct')
     } else if (!card.classList.contains('selected')) {
@@ -141,7 +185,7 @@ function resetConnection() {
   peerConnection?.close()
   signalingClient?.close()
   text_connection.className = 'offline'
-  text_connection.textContent = 'Offline.'
+  text_connection.textContent = 'Offline'
   button_connect.hidden = true
   button_abort.hidden = true
   id_container.removeAttribute('disabled')
@@ -184,11 +228,11 @@ function initPeerConnectionEvents(peerConnection) {
         id_container.hidden = true
         button_connect.hidden = true
         text_connection.className = 'online'
-        text_connection.textContent = 'Online.'
+        text_connection.textContent = 'Online'
       break
       case 'disconnected':
         text_connection.className = 'reconnecting'
-        text_connection.textContent = 'Reconnecting...'
+        text_connection.textContent = 'Reconnecting'
       break
       case 'closed':
         resetConnection()

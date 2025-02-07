@@ -20,21 +20,26 @@
 
 input, button {
   margin-right: 5px;
-  margin-bottom: 5px;
   height: 25px;
 }
 
 p {text-align: center;}
 
+fieldset {
+  border-radius: 10px;
+  text-align: center;
+}
+
 label {
   user-select: none;
   display: inline-flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: center;
   gap: 5px;
   &:has(input:enabled) {
     cursor: pointer;
   }
+  margin-bottom: 5px;
 }
 
 button:enabled, input[type="checkbox"]:enabled {
@@ -57,6 +62,10 @@ h1, p {
   user-select: text;
 }
 
+.online, .offline, .reconnecting {
+  font-weight: bold;
+  font-family: monospace;
+}
 .offline {
   color: orangered;
 }
@@ -67,11 +76,17 @@ h1, p {
   color: orange;
 }
 
-.cleanBreak {
+.horizontal {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   justify-content: center;
+}
+
+.vertical {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 #container {
@@ -86,10 +101,15 @@ h1, p {
   min-width: min-content;
 }
 
+#ui_selectSide {
+  margin-top: 10px;
+}
+
 #gameUI {
   display: flex;
   flex-direction: column;
   align-items: center;
+  margin-top: 10px;
   /* &[disabled] {
     pointer-events: none;
     opacity: 0.1;
