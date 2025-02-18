@@ -1,14 +1,18 @@
 
-import {RTCPerfectNegotiator} from 'rtc-perfect-negotiator'
-import {PeerServerSignalingClient, peerjsIceConfig, ensureClientReady} from 'tiny-peerserver-client'
-import {debug, pageSetup, e, tags, wrap, unwrap, consumeTags} from 'wrapped-elements'
+import {e, unwrap, parallel, log, debug, pageSetup} from 'wrapped-elements'
+import {PRNG} from 'tiny-prng'
+import {RPCBridge} from 'rpc-bridge'
+// import {BinaryTemplate, t} from 'jlc-serializer'
 
-pageSetup({
+await pageSetup({
   title: 'Guess Experiment',
   allowDarkTheme: false, // skip the style injection for this
   stylesheets: 'style.css',
   favicon: false // set to a blank one
 })
+
+// peerConnection.uiContainer can then adopt the stylesheets loaded
+const peerConnection = await import('./peerConnection.js')
 
 /* todo 
 on connection hide table and display side selector,
@@ -32,56 +36,39 @@ a stat viewer is WIP...
 if alternating then total and last10 lines can include stats for both e.g. 10 / 10 (me) 10 / 10 (peer)
 */
 
+const tag = {}
+
 document.body.append(...unwrap(
-  e.div(
+  e.div.tagAndId('mainContainer', tag)(
     e.h1('The Guess Experiment'),
     e.p('Connect to a peer and try to guess the randomly selected card shown on their screen. This can be done using remote viewing (extra sensory perception) or telepathy with the peer who can see the card. Version: 0.2.'),
-    e.div.tagAndId('id_container')(
-      e.label('My ID:',
-        e.input.tagAndId('input_myId')
-        .type('text').value(localStorage.getItem('myId'))
-        .autocapitalize('none')
-      ),
-      e.label('Peer ID:', 
-        e.input.tagAndId('input_peerId')
-        .type('text').value(localStorage.getItem('peerId'))
-        .autocapitalize('none')
-      )
-    ).class('horizontal'),
-    e.div( // connection buttons
-      e.button.tag('button_ready')('Ready for peer connection'),
-      e.button.tag('button_abort')('Abort peer connection').hidden(true),
-      e.button.tag('button_connect')('Try to connect').hidden(true),
-      e.span.tag('text_connection')('Offline').class('offline'),
-    ).class('horizontal'),
-    e.div.tagAndId('ui_selectSide')(
+    peerConnection.uiContainer,
+    e.form.tagAndId('form_selectSide', tag)(
       e.fieldset(e.legend('Select side:'),
         e.label('Guesser:',
-          e.input.tagAndId('radio_guesser')
-          .type('radio').name('side')
+          e.input.type('radio').name('side').value('guesser')
         ),
         e.label('Viewer:',
-          e.input.tagAndId('radio_viewer')
-          .type('radio').name('side')
+          e.input.type('radio').name('side').value('viewer')
         ),
         e.label('Alternate:',
-          e.input.tagAndId('radio_alternate')
-          .type('radio').name('side')
+          e.input.type('radio').name('side').value('alternate')
+          .checked(true)
         )
       ),
       e.fieldset(e.legend('Ready to start?'),
         e.label('Me:',
-          e.input.tagAndId('checkbox_ready')
-          .type('checkbox')
+          e.input.tagAndId('checkbox_ready', tag)
+          .type('checkbox').name('ready').value('me')
         ),
         e.label('Peer:',
-          e.input.tagAndId('checkbox_peerReady')
-          .type('checkbox')
+          e.input.tagAndId('checkbox_peerReady', tag)
+          .type('checkbox').name('ready').value('peer')
         ).style({pointerEvents: 'none'})
       )
     ).class('horizontal').hidden(true),
-    e.div.tagAndId('gameUI')(
-      e.div.tagAndId('table')(...((cards = []) => {
+    e.div.tagAndId('ui_game', tag)(
+      e.div.tagAndId('ui_table', tag)(...((cards = []) => {
         for (const variant of ['star','box','waves','cross','circle']) {
           const card = e.div(
             e.img.draggable(false).src(`zener/${variant}.svg`)
@@ -89,190 +76,141 @@ document.body.append(...unwrap(
           cards.push(card)
         }
         return cards
-      })()),
-      e.div.tagAndId('viewerUI')(
+      })()).set('disabled'),
+      e.div.tagAndId('ui_viewer', tag)(
         e.p(`This is the card your peer must guess to score.`, e.br, 
         `(either through remote viewing or telepathic ability)`, e.br, 
           `You can help by transmitting it telepathically!`)
       ).class('vertical').hidden(true),
-      e.div.tagAndId('guesserUI1')(
+      e.div.tagAndId('ui_guesser1', tag)(
         e.p(`A random card is shown to your peer, to score see if you can guess which!`, e.br, 
         `(remote view it or use telepathic abilities)`),
-        e.button('View the cards')
+        e.button.tag('button_viewCards', tag)('Make your guess')
       ).class('vertical').hidden(true),
-      e.div.tagAndId('guesserUI2')(
-        e.button('Submit your guess!').tag('button_guess'),
-        e.span('Total score: ', e.span('0 / 0').tag('text_myScore')),
-        e.span('Last 10 guesses: ', e.span('0 / 0').tag('text_myLast10'))
+      e.div.tagAndId('ui_guesser2', tag)(
+        e.button('Submit your guess!').tag('button_guess', tag),
       ).class('vertical').hidden(true),
-    ).set('disabled'),
+      e.div.tagAndId('ui_score', tag).class('vertical')(
+        e.span('Total score: ', e.span('0 / 0').tag('text_myScore', tag)),
+        e.span('Last 10 guesses: ', e.span('0 / 0').tag('text_myLast10', tag))
+      ).hidden(true),
+    ),
     e.p('Made by Joakim L. Christiansen.', e.br, 'See the open source ', e.a('code at GitHub').href('https://github.com/JoakimCh/TRNG-Mind-Over-Matter-Experiments/tree/main/guess'), '.')
-  ).id('container')
+  )
 ))
 
-//#region global variables
-const {input_myId, input_peerId, button_ready, 
-  button_connect, table, button_guess, id_container,
-  button_abort, text_connection
-} = consumeTags()
-globalThis['DEBUG_SIGNALING'] = true
-const idSuffix = '-guessExp'
-let myId, peerId
-/** @type {PeerServerSignalingClient} */
-let signalingClient
-/** @type {RTCPeerConnection} */
-let peerConnection
-/** @type {RTCDataChannel} */
-let dataChannel
-//#endregion
-
-function startGuesserSide() {
-
-}
-
-button_guess.onclick = () => {
-  //document.querySelector('.element').classList.add('shrink');
-  const cards = document.getElementsByClassName('card')
-  let selectedIndex = Math.round(Math.random() * 5)
-  // cards[selectedIndex].classList.add('correct')
-  let index = 0
-  for (const card of cards) {
-    if (index++ == selectedIndex) {
-      card.classList.add('correct')
-    } else if (!card.classList.contains('selected')) {
-      card.classList.add('hidden')
-    }
+const cards = document.querySelectorAll('.card')
+//const cards = document.getElementsByClassName('card')
+const prng = new PRNG()
+const peerRpc = new RPCBridge()
+let lastSide
+peerConnection.setRpcBridge(peerRpc)
+peerRpc.on('open', () => {
+  tag.form_selectSide.hidden = false
+  // score = {
+  //   me:   new Score(peerConnection.myId),
+  //   peer: new Score(peerConnection.peerId),
+  // }
+})
+peerRpc.on('peerReady', ready => {
+  tag.checkbox_peerReady.checked = ready
+})
+parallel(tag.form_selectSide.elements['ready']).onchange = () => {
+  const ready = tag.checkbox_ready.checked && tag.checkbox_peerReady.checked
+  if (!ready || !peerConnection.isDominant) {
+    return // not ready or not the deciding side
   }
-}
-
-function card_onClick({currentTarget}) {
-  for (const card of document.getElementsByClassName('card')) {
-    card.classList.remove('selected')
+  let mySide = tag.form_selectSide.elements['side'].value
+  if (mySide == 'alternate') {
+    mySide = (lastSide == 'viewer' ? 'guesser' : 'viewer')
   }
-  currentTarget.classList.add('selected')
-}
-for (const card of document.getElementsByClassName('card')) {
-  card.draggable = false
-  card.onclick = card_onClick
-}
-
-button_ready.onclick = () => {
-  myId = input_myId.value
-  peerId = input_peerId.value
-  if (!myId || !peerId) {
-    alert('Please fill out "my ID" and "peer ID"!')
-    return
-  }
-  localStorage.setItem('myId', myId)
-  localStorage.setItem('peerId', peerId)
-  id_container.setAttribute('disabled','')
-  button_ready.hidden = true
-  button_abort.hidden = false
-  initPeerConnection(myId, peerId, idSuffix)
-}
-
-button_abort.onclick = () => {
-  resetConnection()
-}
-
-button_connect.onclick = () => {
-  button_connect.hidden = true
-  dataChannel = peerConnection.createDataChannel('protocol1')
-  onDataChannel({channel: dataChannel})
-}
-
-function resetConnection() {
-  peerConnection?.close()
-  signalingClient?.close()
-  text_connection.className = 'offline'
-  text_connection.textContent = 'Offline'
-  button_connect.hidden = true
-  button_abort.hidden = true
-  id_container.removeAttribute('disabled')
-  button_ready.hidden = false
-  id_container.hidden = false
-}
-
-async function initPeerConnection(myId, peerId, suffix) {
-  myId += suffix; peerId += suffix
-  try {
-    signalingClient = await ensureClientReady({myId, signalingClient})
-  } catch (error) {
-    button_abort.click()
-    return alert(error)
-  }
-  const signalingChannel = signalingClient.getChannel(peerId)
-  const negotiator = new RTCPerfectNegotiator({
-    peerConfiguration: peerjsIceConfig,
-    signalingChannel
+  lastSide = mySide
+  peerRpc.localEmit('gameStart', {
+    side: mySide
   })
-  peerConnection = negotiator.peerConnection
-  button_connect.hidden = false
-  initPeerConnectionEvents(peerConnection)
-  // (negotiation is not done before a channel or track is added)
+  // peerRpc.emit('gameStart', {
+  //   side: (mySide == 'viewer' ? 'guesser' : 'viewer')
+  // })
 }
-
-/**
- * @param {RTCPeerConnection} peerConnection 
- */
-function initPeerConnectionEvents(peerConnection) {
-  peerConnection.ondatachannel = onDataChannel
-  peerConnection.onconnectionstatechange = () => {
-    debug('connectionState', peerConnection.connectionState)
-    switch (peerConnection.connectionState) {
-      case 'connecting':
-        button_connect.hidden = true
-      break
-      case 'connected':
-        debugConnectionStats()
-        id_container.hidden = true
-        button_connect.hidden = true
-        text_connection.className = 'online'
-        text_connection.textContent = 'Online'
-      break
-      case 'disconnected':
-        text_connection.className = 'reconnecting'
-        text_connection.textContent = 'Reconnecting'
-      break
-      case 'closed':
-        resetConnection()
-      break
-    }
-  }
-}
-
-function onDataChannel({channel} = {}) {
-  if (channel.label == 'protocol1') {
-    dataChannel = channel
-
-    dataChannel.onopen = () => {
-
-    }
-    dataChannel.onmessage = ({data}) => {
-
-    }
-    dataChannel.onerror = ({error}) => {
-      // this will happen if other side e.g. refresh the tab
-    }
-    dataChannel.onclose = () => {
-      resetConnection() // (since there is no reliable events to monitor when a peerConnection is closed we use a data channel to know when)
-    }
-  }
-}
-
-function debugConnectionStats() {
-  peerConnection.getStats().then(reports => {
-    for (const [id, report] of reports) {
-      if (report.type == 'candidate-pair' && report.nominated) {
-        const localCandidate = reports.get(report.localCandidateId)
-        const remoteCandidate = reports.get(report.remoteCandidateId)
-        const [local, remote] = [localCandidate.candidateType, remoteCandidate.candidateType]
-        if (localCandidate.candidateType == 'relay' || remoteCandidate.candidateType == 'relay') {
-          debug(`Relayed connection successful! (${local}, ${remote})`)
-        } else {
-          debug(`Direct connection successful! (${local}, ${remote})`)
+peerRpc.on('gameStart', ({side, }) => {
+  hide('form_selectSide')
+  if (side == 'guesser') {
+    hide('ui_table'); show('ui_guesser1')
+    tag.button_viewCards.onclick = () => {
+      hide('ui_guesser1'); show('ui_guesser2', 'ui_table')
+      enable('ui_table')
+      disable('button_guess')
+      parallel(cards).onclick = ({currentTarget}) => {
+        parallel(cards).classList.remove('selected')
+        currentTarget.classList.add('selected')
+        enable('button_guess')
+      }
+      tag.button_guess.onclick = () => {
+        disable('button_guess')
+        let correctIndex = prng.integer(4)
+        cards[correctIndex].classList.add('correct')
+        parallel(cards).classList.add('showdown')
+        // the css hides cards with .showdown which is missing .correct or .selected
+        const selectedIndex = 
+        parallel(cards).classList.contains('selected').indexOf(true)
+        log(correctIndex, selectedIndex)
+        if (selectedIndex == correctIndex) {
+          
         }
       }
     }
-  })
+  } else if (side == 'viewer') {
+
+  } else throw Error('lol')
+})
+
+peerRpc.localEmit('open'); tag.checkbox_peerReady.checked = true
+peerRpc.localEmit('gameStart', {side: 'guesser'})
+
+
+// parallel(cards).classList.remove('correct', 'selected', 'hidden')
+
+//#region shit
+function groupPropChange(group, elementNames, prop, value) {
+  for (const elementName of elementNames) {
+    group[elementName][prop] = value
+  }
 }
+function groupAttrChange(group, elementNames, attribute, present) {
+  for (const elementName of elementNames) {
+    if (present) {
+      group[elementName].setAttribute(attribute,'')
+    } else {
+      group[elementName].removeAttribute(attribute)
+    }
+  }
+}
+function hide(...elementNames) {
+  groupPropChange(tag, elementNames, 'hidden', true)
+}
+function show(...elementNames) {
+  groupPropChange(tag, elementNames, 'hidden', false)
+}
+function disable(...elementNames) {
+  groupAttrChange(tag, elementNames, 'disabled', true)
+}
+function enable(...elementNames) {
+  groupAttrChange(tag, elementNames, 'disabled', false)
+}
+
+class Score {
+  id = ''; total = 0; games = 0; last10 = []
+  constructor(id) {
+    this.id = id
+  }
+  register(win) {
+    this.games ++
+    if (win) this.total ++
+    last10.push(win)
+    if (this.last10.length > 10) {
+      this.last10.shift()
+    }
+  }
+}
+let score
+//#endregion
