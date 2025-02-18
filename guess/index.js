@@ -36,14 +36,14 @@ a stat viewer is WIP...
 if alternating then total and last10 lines can include stats for both e.g. 10 / 10 (me) 10 / 10 (peer)
 */
 
-const tag = {}
+const ui = {}//, button = {}, container = {}, text = {}
 
-document.body.append(...unwrap(
-  e.div.tagAndId('mainContainer', tag)(
+document.body.append(
+  ui.mainContainer = e.div.id('mainContainer')(
     e.h1('The Guess Experiment'),
     e.p('Connect to a peer and try to guess the randomly selected card shown on their screen. This can be done using remote viewing (extra sensory perception) or telepathy with the peer who can see the card. Version: 0.2.'),
     peerConnection.uiContainer,
-    e.form.tagAndId('form_selectSide', tag)(
+    ui.selectSide = e.form.id('form_selectSide')(
       e.fieldset(e.legend('Select side:'),
         e.label('Guesser:',
           e.input.type('radio').name('side').value('guesser')
@@ -58,17 +58,17 @@ document.body.append(...unwrap(
       ),
       e.fieldset(e.legend('Ready to start?'),
         e.label('Me:',
-          e.input.tagAndId('checkbox_ready', tag)
+          ui.checkbox_ready = e.input.id('checkbox_ready')
           .type('checkbox').name('ready').value('me')
         ),
         e.label('Peer:',
-          e.input.tagAndId('checkbox_peerReady', tag)
+          ui.checkbox_peerReady = e.input.id('checkbox_peerReady')
           .type('checkbox').name('ready').value('peer')
         ).style({pointerEvents: 'none'})
       )
     ).class('horizontal').hidden(true),
-    e.div.tagAndId('ui_game', tag)(
-      e.div.tagAndId('ui_table', tag)(...((cards = []) => {
+    ui.game = e.div.id('ui_game')(
+      ui.table = e.div.id('ui_table')(...((cards = []) => {
         for (const variant of ['star','box','waves','cross','circle']) {
           const card = e.div(
             e.img.draggable(false).src(`zener/${variant}.svg`)
@@ -77,27 +77,14 @@ document.body.append(...unwrap(
         }
         return cards
       })()).set('disabled'),
-      e.div.tagAndId('ui_viewer', tag)(
-        e.p(`This is the card your peer must guess to score.`, e.br, 
-        `(either through remote viewing or telepathic ability)`, e.br, 
-          `You can help by transmitting it telepathically!`)
-      ).class('vertical').hidden(true),
-      e.div.tagAndId('ui_guesser1', tag)(
-        e.p(`A random card is shown to your peer, to score see if you can guess which!`, e.br, 
-        `(remote view it or use telepathic abilities)`),
-        e.button.tag('button_viewCards', tag)('Make your guess')
-      ).class('vertical').hidden(true),
-      e.div.tagAndId('ui_guesser2', tag)(
-        e.button('Submit your guess!').tag('button_guess', tag),
-      ).class('vertical').hidden(true),
-      e.div.tagAndId('ui_score', tag).class('vertical')(
-        e.span('Total score: ', e.span('0 / 0').tag('text_myScore', tag)),
-        e.span('Last 10 guesses: ', e.span('0 / 0').tag('text_myLast10', tag))
+      ui.score = e.div.id('ui_score').class('vertical')(
+        ui.text_myScore = e.span('Total score: ', e.span('0 / 0')),
+        ui.text_myLast10 = e.span('Last 10 guesses: ', e.span('0 / 0'))
       ).hidden(true),
     ),
     e.p('Made by Joakim L. Christiansen.', e.br, 'See the open source ', e.a('code at GitHub').href('https://github.com/JoakimCh/TRNG-Mind-Over-Matter-Experiments/tree/main/guess'), '.')
-  )
-))
+  ).element
+)
 
 const cards = document.querySelectorAll('.card')
 //const cards = document.getElementsByClassName('card')
@@ -106,21 +93,21 @@ const peerRpc = new RPCBridge()
 let lastSide
 peerConnection.setRpcBridge(peerRpc)
 peerRpc.on('open', () => {
-  tag.form_selectSide.hidden = false
+  ui.selectSide.hidden = false
   // score = {
   //   me:   new Score(peerConnection.myId),
   //   peer: new Score(peerConnection.peerId),
   // }
 })
 peerRpc.on('peerReady', ready => {
-  tag.checkbox_peerReady.checked = ready
+  ui.checkbox_peerReady.checked = ready
 })
-parallel(tag.form_selectSide.elements['ready']).onchange = () => {
-  const ready = tag.checkbox_ready.checked && tag.checkbox_peerReady.checked
+parallel(ui.selectSide.elements['ready']).onchange = () => {
+  const ready = ui.checkbox_ready.checked && ui.checkbox_peerReady.checked
   if (!ready || !peerConnection.isDominant) {
     return // not ready or not the deciding side
   }
-  let mySide = tag.form_selectSide.elements['side'].value
+  let mySide = ui.selectSide.elements['side'].value
   if (mySide == 'alternate') {
     mySide = (lastSide == 'viewer' ? 'guesser' : 'viewer')
   }
@@ -133,69 +120,74 @@ parallel(tag.form_selectSide.elements['ready']).onchange = () => {
   // })
 }
 peerRpc.on('gameStart', ({side, }) => {
-  hide('form_selectSide')
+  hide(ui.selectSide)
   if (side == 'guesser') {
-    hide('ui_table'); show('ui_guesser1')
-    tag.button_viewCards.onclick = () => {
-      hide('ui_guesser1'); show('ui_guesser2', 'ui_table')
-      enable('ui_table')
-      disable('button_guess')
+    hide(ui.table)
+    const container = e.div.class('vertical')(
+      e.p(`A random card is shown to your peer, to score see if you can guess which!`, e.br, `(remote view it or use telepathic abilities)`),
+      e.button('Make your guess').onclick(viewCards)
+    )
+    ui.table.after(container.element)
+    function viewCards() {
+      container.replaceChildren()
+      show(ui.table); enable(ui.table)
+      let firstGuess = true
       parallel(cards).onclick = ({currentTarget}) => {
         parallel(cards).classList.remove('selected')
         currentTarget.classList.add('selected')
-        enable('button_guess')
-      }
-      tag.button_guess.onclick = () => {
-        disable('button_guess')
-        let correctIndex = prng.integer(4)
-        cards[correctIndex].classList.add('correct')
-        parallel(cards).classList.add('showdown')
-        // the css hides cards with .showdown which is missing .correct or .selected
-        const selectedIndex = 
-        parallel(cards).classList.contains('selected').indexOf(true)
-        log(correctIndex, selectedIndex)
-        if (selectedIndex == correctIndex) {
-          
+        if (firstGuess) { firstGuess = false
+          container.add(e.button('Submit your guess!').onclick(submitGuess))
         }
       }
     }
+    function submitGuess({currentTarget}) {
+      currentTarget.remove()
+      let correctIndex = prng.integer(4)
+      cards[correctIndex].classList.add('correct')
+      parallel(cards).classList.add('showdown')
+      // the css hides cards with .showdown which is missing .correct or .selected
+      const selectedIndex = parallel(cards).classList.contains('selected').indexOf(true)
+      if (selectedIndex == correctIndex) {
+        container.add(e.p(`Correct!`))
+      } else {
+        container.add(e.p(`Wrong.`))
+      }
+      container.add(e.button('Ready for next round').onclick(waitNextRound))
+    }
+    function waitNextRound({currentTarget}) {
+      currentTarget.remove()
+      container.add(e.p(`Waiting for the peer to be ready...`))
+      // fake for now:
+      setTimeout(() => {
+        container.remove()
+        parallel(cards).classList.remove('correct', 'selected', 'showdown')
+        peerRpc.localEmit('gameStart', {side})
+      }, 2000)
+    }
   } else if (side == 'viewer') {
-
+    // e.div.tagAndId('ui_viewer', ui)(
+    //   e.p(`This is the card your peer must guess to score.`, e.br, 
+    //   `(either through remote viewing or telepathic ability)`, e.br, 
+    //     `You can help by transmitting it telepathically!`)
+    // ).class('vertical').hidden(true),
   } else throw Error('lol')
 })
 
-peerRpc.localEmit('open'); tag.checkbox_peerReady.checked = true
+peerRpc.localEmit('open'); ui.checkbox_peerReady.checked = true
 peerRpc.localEmit('gameStart', {side: 'guesser'})
 
-
-// parallel(cards).classList.remove('correct', 'selected', 'hidden')
-
 //#region shit
-function groupPropChange(group, elementNames, prop, value) {
-  for (const elementName of elementNames) {
-    group[elementName][prop] = value
-  }
+function hide(...elements) {
+  parallel(elements).hidden = true
 }
-function groupAttrChange(group, elementNames, attribute, present) {
-  for (const elementName of elementNames) {
-    if (present) {
-      group[elementName].setAttribute(attribute,'')
-    } else {
-      group[elementName].removeAttribute(attribute)
-    }
-  }
+function show(...elements) {
+  parallel(elements).hidden = false
 }
-function hide(...elementNames) {
-  groupPropChange(tag, elementNames, 'hidden', true)
+function disable(...elements) {
+  parallel(elements).setAttribute('disabled','')
 }
-function show(...elementNames) {
-  groupPropChange(tag, elementNames, 'hidden', false)
-}
-function disable(...elementNames) {
-  groupAttrChange(tag, elementNames, 'disabled', true)
-}
-function enable(...elementNames) {
-  groupAttrChange(tag, elementNames, 'disabled', false)
+function enable(...elements) {
+  parallel(elements).removeAttribute('disabled')
 }
 
 class Score {
