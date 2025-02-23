@@ -98,11 +98,19 @@ function checkReady() {
 }
 
 peerRpc.on('open', () => {
-  ui.selectSide.hidden = false
+  show(ui.selectSide)
+  if (peerConnection.isDominant) {
+    const side = ui.selectSide.elements['side'].value
+    peerRpc.emit('peerSide', side)
+  }
   // score = {
   //   me:   new Score(peerConnection.myId),
   //   peer: new Score(peerConnection.peerId),
   // }
+})
+peerRpc.on('close', () => {
+  hide(ui.selectSide)
+  show(ui.table); disable(ui.table)
 })
 
 peerRpc.on('peerReady', ready => {
@@ -122,6 +130,9 @@ peerRpc.on('peerSide', peerSide => {
 })
 
 peerRpc.on('sidesSelected', ({side, alternate}) => {
+
+  ui.checkbox_ready.checked = false
+  ui.checkbox_peerReady.checked = false
   lastSide = side
   peerRpc.localEmit('nextRound')
   alternating = alternate
