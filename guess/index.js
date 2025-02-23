@@ -1,8 +1,11 @@
 
-import {e, unwrap, parallel, log, debug, pageSetup} from 'wrapped-elements'
+import {e, unwrap, parallel, log, debug, pageSetup, show, hide, disable, enable} from 'wrapped-elements'
 import {PRNG} from 'tiny-prng'
 import {RPCBridge} from 'rpc-bridge'
 // import {BinaryTemplate, t} from 'jlc-serializer'
+RPCBridge.debug = (...values) => {
+  console.debug('RPCBridge', ...values)
+}
 
 await pageSetup({
   title: 'Guess Experiment',
@@ -14,37 +17,15 @@ await pageSetup({
 // peerConnection.uiContainer can then adopt the stylesheets loaded
 const peerConnection = await import('./peerConnection.js')
 
-/* todo 
-on connection hide table and display side selector,
-radio for which peer is remote viewer:
-remote viewer: you (), peer (), alternate (*)
-whenever someone clicks it changes for both... so they can fight
-then ready checkbox and a text indicating if peer is ready, ready is deselected on each switch
-when both ready it starts, first with text on which side you are:
-"A random card is shown to your peer, to score see if you can guess which!
-     (remote view it or use your telepathic ability)"
-[show cards] (then shows the cards and you can make selection)
-other side:
-header below cards: "this is the card your peer must guess to score
-        (either through remote viewing or telepathic ability)
-          you can help by transmitting it telepathically"
-
-stats are stored in the browser and can be downloaded as a csv
-then stats for each peer and session and total stats, etc
-a stat viewer is WIP...
-
-if alternating then total and last10 lines can include stats for both e.g. 10 / 10 (me) 10 / 10 (peer)
-*/
-
-const ui = {}//, button = {}, container = {}, text = {}
+const ui = {}
 
 document.body.append(
   ui.mainContainer = e.div.id('mainContainer')(
     e.h1('The Guess Experiment'),
-    e.p('Connect to a peer and try to guess the randomly selected card shown on their screen. This can be done using remote viewing (extra sensory perception) or telepathy with the peer who can see the card. Version: 0.2.'),
+    e.p('Connect to a peer and one of you will try to guess the randomly selected card which is shown on the other screen. This can be done using remote viewing (extra sensory perception) or telepathy. You can even play with yourself by connecting two devices. Version: 0.9.'),
     peerConnection.uiContainer,
-    ui.selectSide = e.form.id('form_selectSide')(
-      e.fieldset(e.legend('Select side:'),
+    ui.selectSide = e.form.id('form_selectSide').class('horizontal').hidden(true)(
+      ui.sideFieldset = e.fieldset(e.legend('Select side:'),
         e.label('Guesser:',
           e.input.type('radio').name('side').value('guesser')
         ),
@@ -59,39 +40,63 @@ document.body.append(
       e.fieldset(e.legend('Ready to start?'),
         e.label('Me:',
           ui.checkbox_ready = e.input.id('checkbox_ready')
-          .type('checkbox').name('ready').value('me')
+          .type('checkbox').name('ready').value('me')()
         ),
-        e.label('Peer:',
+        e.label.style({pointerEvents: 'none'})('Peer:',
           ui.checkbox_peerReady = e.input.id('checkbox_peerReady')
-          .type('checkbox').name('ready').value('peer')
-        ).style({pointerEvents: 'none'})
+          .type('checkbox').name('ready').value('peer')()
+        )
       )
-    ).class('horizontal').hidden(true),
+    ),
     ui.game = e.div.id('ui_game')(
-      ui.table = e.div.id('ui_table')(...((cards = []) => {
+      ui.table = e.div.id('ui_table').set('disabled')(...((cards = []) => {
         for (const variant of ['star','box','waves','cross','circle']) {
-          const card = e.div(
+          const card = e.div.class('card')(
             e.img.draggable(false).src(`zener/${variant}.svg`)
-          ).class('card')
+          )
           cards.push(card)
         }
         return cards
-      })()).set('disabled'),
-      ui.score = e.div.id('ui_score').class('vertical')(
+      })()),
+      ui.score = e.div.id('ui_score').class('vertical').hidden(true)(
         ui.text_myScore = e.span('Total score: ', e.span('0 / 0')),
         ui.text_myLast10 = e.span('Last 10 guesses: ', e.span('0 / 0'))
-      ).hidden(true),
+      ),
     ),
-    e.p('Made by Joakim L. Christiansen.', e.br, 'See the open source ', e.a('code at GitHub').href('https://github.com/JoakimCh/TRNG-Mind-Over-Matter-Experiments/tree/main/guess'), '.')
-  ).element
+    e.p('Made by Joakim L. Christiansen.', e.br, 'See the open source ', e.a.add('code at GitHub').href('https://github.com/JoakimCh/TRNG-Mind-Over-Matter-Experiments/tree/main/guess'), '.')
+  )
 )
 
-const cards = document.querySelectorAll('.card')
-//const cards = document.getElementsByClassName('card')
+const cards = document.querySelectorAll('.card') // getElementsByClassName('card')
 const prng = new PRNG()
 const peerRpc = new RPCBridge()
-let lastSide
 peerConnection.setRpcBridge(peerRpc)
+let lastSide, alternating
+
+ui.sideFieldset.onchange = () => {
+  // (radio button events bubbles up to it)
+  const side = ui.selectSide.elements['side'].value
+  peerRpc.emit('peerSide', side)
+}
+
+ui.checkbox_ready.onchange = ({currentTarget: {checked}}) => {
+  peerRpc.emit('peerReady', checked)
+  checkReady()
+}
+
+function checkReady() {
+  const ready = ui.checkbox_ready.checked && ui.checkbox_peerReady.checked
+  if (!ready || !peerConnection.isDominant) {
+    return // not ready or not the deciding side
+  }
+  let mySide = ui.selectSide.elements['side'].value
+  const alternate = (mySide == 'alternate')
+  if (alternate) mySide = ['viewer','guesser'][prng.integer(1)]
+  const peerSide = (mySide == 'viewer' ? 'guesser' : 'viewer')
+  peerRpc.emit('sidesSelected', {side: peerSide, alternate})
+  peerRpc.localEmit('sidesSelected', {side: mySide, alternate})
+}
+
 peerRpc.on('open', () => {
   ui.selectSide.hidden = false
   // score = {
@@ -99,96 +104,113 @@ peerRpc.on('open', () => {
   //   peer: new Score(peerConnection.peerId),
   // }
 })
+
 peerRpc.on('peerReady', ready => {
   ui.checkbox_peerReady.checked = ready
+  checkReady()
 })
-parallel(ui.selectSide.elements['ready']).onchange = () => {
-  const ready = ui.checkbox_ready.checked && ui.checkbox_peerReady.checked
-  if (!ready || !peerConnection.isDominant) {
-    return // not ready or not the deciding side
+
+peerRpc.on('peerSide', peerSide => {
+  let mySide
+  switch (peerSide) {
+    case 'viewer': mySide = 'guesser'; break
+    case 'guesser': mySide = 'viewer'; break
+    case 'alternate': mySide = 'alternate'; break
   }
-  let mySide = ui.selectSide.elements['side'].value
-  if (mySide == 'alternate') {
-    mySide = (lastSide == 'viewer' ? 'guesser' : 'viewer')
-  }
-  lastSide = mySide
-  peerRpc.localEmit('gameStart', {
-    side: mySide
-  })
-  // peerRpc.emit('gameStart', {
-  //   side: (mySide == 'viewer' ? 'guesser' : 'viewer')
-  // })
+  const radio = ui.selectSide.querySelector(`input[name="side"][value="${mySide}"]`)
+  radio.checked = true
+})
+
+peerRpc.on('sidesSelected', ({side, alternate}) => {
+  lastSide = side
+  peerRpc.localEmit('nextRound')
+  alternating = alternate
+})
+
+function signalNextRound() {
+  peerRpc.emit('nextRound')
+  peerRpc.localEmit('nextRound')
 }
-peerRpc.on('gameStart', ({side, }) => {
+
+peerRpc.on('nextRound', () => {
+  let side = lastSide
+  if (alternating) {
+    side = (lastSide == 'viewer' ? 'guesser' : 'viewer')
+  }
   hide(ui.selectSide)
+  // create a container for game specific elements
+  const container = e.div.class('vertical')
+  // add it after the table showing the cards
+  ui.table.after(container.element)
+  peerRpc.once('nextRound', cleanup, {first: true})
+  peerRpc.once('close', cleanup)
+  function cleanup() {
+    container.remove()
+    parallel(cards).classList.remove('correct', 'selected', 'showdown')
+    peerRpc.off('close', cleanup)
+    peerRpc.off('nextRound', cleanup)
+  }
   if (side == 'guesser') {
-    hide(ui.table)
-    const container = e.div.class('vertical')(
+    hide(ui.table) // hide the cards
+    container(
       e.p(`A random card is shown to your peer, to score see if you can guess which!`, e.br, `(remote view it or use telepathic abilities)`),
-      e.button('Make your guess').onclick(viewCards)
+      e.button.add('Make your guess').onclick(viewCards)
     )
-    ui.table.after(container.element)
     function viewCards() {
       container.replaceChildren()
       show(ui.table); enable(ui.table)
       let firstGuess = true
-      parallel(cards).onclick = ({currentTarget}) => {
+      parallel(cards).onclick = ({currentTarget: currentCard}) => {
         parallel(cards).classList.remove('selected')
-        currentTarget.classList.add('selected')
-        if (firstGuess) { firstGuess = false
-          container.add(e.button('Submit your guess!').onclick(submitGuess))
+        currentCard.classList.add('selected')
+        if (firstGuess) {firstGuess = false
+          container.add(e.button.add('Submit your guess!').onclick(submitGuess))
         }
       }
     }
-    function submitGuess({currentTarget}) {
-      currentTarget.remove()
-      let correctIndex = prng.integer(4)
-      cards[correctIndex].classList.add('correct')
-      parallel(cards).classList.add('showdown')
-      // the css hides cards with .showdown which is missing .correct or .selected
+    async function submitGuess({currentTarget: button}) {
+      button.remove()
+      parallel(cards).onclick = undefined
       const selectedIndex = parallel(cards).classList.contains('selected').indexOf(true)
-      if (selectedIndex == correctIndex) {
-        container.add(e.p(`Correct!`))
-      } else {
-        container.add(e.p(`Wrong.`))
-      }
-      container.add(e.button('Ready for next round').onclick(waitNextRound))
-    }
-    function waitNextRound({currentTarget}) {
-      currentTarget.remove()
-      container.add(e.p(`Waiting for the peer to be ready...`))
-      // fake for now:
+      const correctIndex = await peerRpc.call('guess', selectedIndex)
       setTimeout(() => {
-        container.remove()
-        parallel(cards).classList.remove('correct', 'selected', 'showdown')
-        peerRpc.localEmit('gameStart', {side})
-      }, 2000)
+        cards[correctIndex].classList.add('correct')
+        parallel(cards).classList.add('showdown')
+        if (selectedIndex == correctIndex) {
+          container.add(e.p(`Correct!`))
+        } else {
+          container.add(e.p(`Wrong.`))
+        }
+        setTimeout(() => {
+          // now the peer has been given enough time to see the result and we can start the next round
+          container.add(e.button.add('Start next round').onclick(() => signalNextRound()))
+        }, 1000)
+      }, 1000)
     }
   } else if (side == 'viewer') {
-    // e.div.tagAndId('ui_viewer', ui)(
-    //   e.p(`This is the card your peer must guess to score.`, e.br, 
-    //   `(either through remote viewing or telepathic ability)`, e.br, 
-    //     `You can help by transmitting it telepathically!`)
-    // ).class('vertical').hidden(true),
+    enable(ui.table) // make cards bright
+    container(
+      e.p(`This is the card your peer must guess to score.`, e.br, 
+      `(either through remote viewing or telepathic ability)`, e.br, 
+        `You can help by transmitting it telepathically!`),
+    )
+    const correctIndex = prng.integer(4)
+    cards[correctIndex].classList.add('correct')
+    parallel(cards).classList.add('showdown') // hide others
+    peerRpc.bind('guess', indexGuessed => {
+      peerRpc.unbind('guess') // to throw error if called again
+      cards[indexGuessed].classList.add('selected')
+      container.replaceChildren()
+      if (indexGuessed == correctIndex) {
+        container.add(e.p(`Peer guessed correct!`))
+      } else {
+        container.add(e.p(`Peer guessed wrong.`))
+      }
+      container.add(e.p(`Waiting for peer to start next round...`))
+      return correctIndex
+    })
   } else throw Error('lol')
 })
-
-peerRpc.localEmit('open'); ui.checkbox_peerReady.checked = true
-peerRpc.localEmit('gameStart', {side: 'guesser'})
-
-//#region shit
-function hide(...elements) {
-  parallel(elements).hidden = true
-}
-function show(...elements) {
-  parallel(elements).hidden = false
-}
-function disable(...elements) {
-  parallel(elements).setAttribute('disabled','')
-}
-function enable(...elements) {
-  parallel(elements).removeAttribute('disabled')
-}
 
 class Score {
   id = ''; total = 0; games = 0; last10 = []
@@ -205,4 +227,3 @@ class Score {
   }
 }
 let score
-//#endregion

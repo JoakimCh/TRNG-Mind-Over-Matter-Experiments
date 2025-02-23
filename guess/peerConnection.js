@@ -30,24 +30,24 @@ const styles = [
 
 // We don't really need to use a shadow DOM here, but it allows us to avoid any ID collisions between HTML-elements declared elsewhere, hence it's a good habit!
 export const uiContainer = e.div.id('ui_peerConnection').attachShadow({mode: 'open'}).shadowAdoptStyles(styles).shadowAdd(
-  e.div.tag('idContainer', ui)(
+  e.div.tag('idContainer', ui).class('horizontal')(
     e.label('My ID:',
       e.input.tagAndId('input_myId', ui)
-      .type('text').value(localStorage.getItem('myId'))
+      .type('text').value(sessionStorage.getItem('myId') || localStorage.getItem('myId'))
       .autocapitalize('none')
     ),
     e.label('Peer ID:', 
       e.input.tagAndId('input_peerId', ui)
-      .type('text').value(localStorage.getItem('peerId'))
+      .type('text').value(sessionStorage.getItem('peerId') || localStorage.getItem('peerId'))
       .autocapitalize('none')
     )
-  ).class('horizontal'),
-  e.div(
+  ),
+  e.div.class('horizontal')(
     e.button.tag('button_ready', ui)('Ready for peer connection'),
-    e.button.tag('button_abort', ui)('Abort peer connection').hidden(true),
-    e.button.tag('button_connect', ui)('Try to connect').hidden(true),
-    e.span.tag('text_connection', ui)('Offline').class('offline'),
-  ).class('horizontal')
+    e.button.tag('button_abort', ui).hidden(true)('Abort peer connection'),
+    e.button.tag('button_connect', ui).hidden(true)('Try to connect'),
+    e.span.tag('text_connection', ui).class('offline')('Offline'),
+  )
 )
 
 ui.button_ready.onclick = () => {
@@ -57,6 +57,8 @@ ui.button_ready.onclick = () => {
     alert('Please fill out "my ID" and "peer ID"!')
     return
   }
+  sessionStorage.setItem('myId', myId)
+  sessionStorage.setItem('peerId', peerId)
   localStorage.setItem('myId', myId)
   localStorage.setItem('peerId', peerId)
   ui.idContainer.setAttribute('disabled','')
