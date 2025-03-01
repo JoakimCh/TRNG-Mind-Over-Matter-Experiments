@@ -5,7 +5,8 @@ import {log, pageSetup, e} from '../wrapped-elements/wrapped-elements.js'
 pageSetup({
   title: 'Speak Experiment',
   favicon: 'speak.png',
-  stylesheets: 'style.css'
+  stylesheets: 'style.css',
+  stylesheetsAsLinks: true
 })
 
 const el = {}
@@ -131,7 +132,8 @@ function displayWord(word, {unbiased, visibleTime = 2000} = {}) {
     span.classList.add('fade')
     setTimeout(() => {
       span.remove()
-      el.history.textContent += word + ' '
+      span.classList.remove('fade')
+      el.history.append(span)
     }, 1000) // fade time
   }, visibleTime)
 }
