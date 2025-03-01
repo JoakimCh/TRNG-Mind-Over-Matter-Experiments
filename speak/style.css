@@ -1,4 +1,8 @@
 
+html, body {
+  overscroll-behavior-y: contain; /* fixes refresh on down scroll */
+}
+
 button {
   margin: 10px;
   font-size: large;

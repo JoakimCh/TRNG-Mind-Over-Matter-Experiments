@@ -1,6 +1,6 @@
 
 import {TRNG} from '../TRNG.browser.js'
-import {log, pageSetup, e, tags, wrap, unwrap, consumeTags} from '../wrapped-elements/wrapped-elements.js'
+import {log, pageSetup, e} from '../wrapped-elements/wrapped-elements.js'
 
 pageSetup({
   title: 'Speak Experiment',
@@ -8,22 +8,23 @@ pageSetup({
   stylesheets: 'style.css'
 })
 
-document.body.append(...unwrap(
+const el = {}
+
+document.body.append(
   e.h1('Speak Experiment'),
   e.p('A strong enough mind can influence the spoken words! Which could enable trans-dimensional communication...'),
-  e.div.tagAndId('history'),
-  e.div.tagAndId('spoken'),
+  el.history = e.div.id('history')(),
+  el.spoken = e.div.id('spoken')(),
   e.div(
-    e.button('Start experiment').tag('start'),
-    e.button('Stop experiment').tag('stop').hidden(true),
+    el.start = e.button('Start experiment'),
+    el.stop = e.button.hidden(true)('Stop experiment'),
   )
-))
+)
 
 /** Our tagged elements.
  * @info Here we use TypeScript type definitions so VSCode can know the contents of el.
  * @type {Record<'start'|'stop'|'history'|'spoken', HTMLElement>} 
 */
-const el = consumeTags()
 
 // (44100 is one second of samples)
 const trng = new TRNG({blockSize: 44100, outputLength: 16})
@@ -77,6 +78,7 @@ el.start.onclick = async () => {
     el.start.hidden = false
   }
 }
+
 el.stop.onclick = () => {
   if (!stopping) {
     stopping = true
@@ -122,9 +124,9 @@ async function loadWordlist() {
 
 function displayWord(word, {unbiased, visibleTime = 2000} = {}) {
   log((unbiased ? 'unbiased: ' : '') + word)
-  const span = e.span(word + '\u00A0').className('word')
+  const span = e.span.class('word')(word + '\u00A0')
   if (unbiased) span.classList.add('unbiased')
-  el.spoken.append(span.element)
+  el.spoken.append(span)
   setTimeout(() => {
     span.classList.add('fade')
     setTimeout(() => {

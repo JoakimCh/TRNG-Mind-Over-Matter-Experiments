@@ -1,8 +1,8 @@
 
-
 body, html {
   height: 100%;
   overflow: hidden;
+  overscroll-behavior-y: contain; /* fixes refresh on down scroll */
 }
 
 #ufo {
@@ -10,7 +10,7 @@ body, html {
   left: 50%;
   width: 100px;
   transform: translateX(-50%);
-  /* transition: bottom 0.1s; */
+  transition: bottom 0.1s;
 }
 
 h1 {
